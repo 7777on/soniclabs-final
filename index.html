@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SonicLab - Forja tus Hits</title>
+    
+    <!-- Dependencias Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@2.1.4/build/MidiWriter.min.js"></script>
+
+    <!-- Estilos CSS -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #000000; color: #e0e0e0; }
+        #animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .gradient-text {
+            background: linear-gradient(90deg, #F59E0B, #FF1B6B);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 8px rgba(255, 27, 107, 0.7), 0 0 12px rgba(245, 158, 11, 0.5);
+        }
+        .card-bg { background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); }
+        .modal-backdrop { display: none; align-items: center; justify-content: center; position: fixed; z-index: 1100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); opacity: 0; transition: opacity 0.3s ease; }
+        .modal-backdrop.active { display: flex; opacity: 1; }
+        .modal-content { background-color: #111; padding: 2rem; border: 1px solid #FF1B6B; width: 90%; max-width: 600px; border-radius: 1rem; position: relative; }
+        .close-button { position: absolute; top: 1rem; right: 1.5rem; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .loader { border: 4px solid #4B5563; border-top: 4px solid #FF1B6B; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .file-input { width: 100%; background-color: #1F2937; border: 1px solid #4B5563; color: white; border-radius: 0.5rem; padding: 0.5rem 0.75rem; file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100; }
+        .download-button { background-color: #FF1B6B; color: white; transition: background-color 0.2s; }
+        .premium-tool-glow { box-shadow: 0 0 15px rgba(245, 158, 11, 0.5), 0 0 5px rgba(245, 158, 11, 0.7); border-color: rgba(245, 158, 11, 0.7); }
+        .disabled-tool { opacity: 0.6; cursor: not-allowed !important; }
+        .locked-overlay { position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; border-radius: 1rem; cursor: pointer; }
+        .featured-plan { border: 2px solid #F59E0B; transform: scale(1.05); box-shadow: 0 0 30px rgba(245, 158, 11, 0.4); }
+        /* --- Estilos Neón para Planes --- */
+        .plan-creator { color: #34D399; text-shadow: 0 0 5px #34D399, 0 0 10px #10B981; }
+        .plan-icono { color: #FBBF24; text-shadow: 0 0 5px #FBBF24, 0 0 10px #F59E0B; }
+        .plan-producer { color: #EC4899; text-shadow: 0 0 5px #EC4899, 0 0 10px #DB2777; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <canvas id="animated-bg"></canvas>
+
+    <header class="fixed w-full z-50 bg-black/80 backdrop-blur-lg border-b border-gray-800">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-2xl font-black text-white uppercase tracking-widest">SONIC<span class="gradient-text">LAB</span></div>
+            <div id="user-status-container" class="flex items-center gap-4 text-right"></div>
+        </nav>
+    </header>
+
+    <div id="admin-panel" class="hidden fixed bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur-sm border-t-2 border-green-500 p-4 z-[1001]">
+        <div class="container mx-auto text-center">
+            <h3 class="font-bold text-green-400 mb-4 text-lg tracking-widest uppercase">PANEL DE ARQUITECTO</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="admin-email" class="text-xs text-gray-400 block mb-1">Email del Usuario</label>
+                    <input type="email" id="admin-email" placeholder="usuario@email.com" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label for="admin-plan" class="text-xs text-gray-400 block mb-1">Otorgar Plan Vitalicio</label>
+                    <select id="admin-plan" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-2 text-sm w-full">
+                        <option value="NINGUNO">Ninguno</option>
+                        <option value="PRO">PRODUCER</option>
+                        <option value="DIAMANTE">ICONO</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="admin-credits" class="text-xs text-gray-400 block mb-1">Añadir Créditos</label>
+                    <input type="number" id="admin-credits" placeholder="Ej: 50" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-2 text-sm w-full">
+                </div>
+            </div>
+            <div id="admin-link-container" class="mt-4">
+                 <button id="admin-generate-link" class="bg-green-600 hover:bg-green-700 text-white font-bold text-sm py-2 px-6 rounded">Generar Email de Activación</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="pt-24">
+        <section class="text-center container mx-auto px-6 py-16">
+            <h1 class="relative text-5xl md:text-7xl font-black leading-tight mb-4 text-white uppercase">
+                Tu Arsenal Creativo. <span class="gradient-text">De la Idea al Icono.</span>
+            </h1>
+            <p class="max-w-3xl mx-auto text-lg md:text-xl text-gray-400 my-8">
+                Accede a herramientas de IA únicas para crear melodías, flows y estrategias que te pondrán en el mapa.
+            </p>
+        </section>
+
+        <section id="tools" class="container mx-auto px-6 py-24">
+            <h2 class="text-4xl font-bold text-center mb-12 text-white">El Laboratorio</h2>
+            <div id="tools-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"></div>
+            <h2 class="text-4xl font-bold text-center mb-12 text-white mt-16">Arsenal de <span class="gradient-text">Élite</span></h2>
+            <div id="elite-tools-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"></div>
+        </section>
+
+        <section id="pricing" class="bg-black/50 py-24">
+            <div class="container mx-auto px-6">
+                <h2 class="text-4xl font-bold text-center mb-12 text-white">Acceso al Laboratorio</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <!-- Plan PRO Mensual -->
+                    <div class="card-bg p-6 rounded-xl flex flex-col h-full">
+                        <h3 class="text-2xl font-bold text-white">Plan PRODUCER</h3>
+                        <p class="text-gray-400 mb-4">Mensual</p>
+                        <p class="text-4xl font-extrabold text-white mb-4">$4.990<span class="text-lg font-medium text-gray-400">/mes</span></p>
+                        <ul class="space-y-3 text-gray-300 mb-6 flex-grow">
+                            <li class="flex items-center"><b class="text-pink-500 mr-2">✓</b><span><b>50 Créditos</b> Mensuales</span></li>
+                            <li class="flex items-center"><b class="text-pink-500 mr-2">✓</b><span>Acceso a Herramientas PRO</span></li>
+                            <li class="flex items-center"><b class="text-pink-500 mr-2">✓</b><span>Acordes & Email Pitch</span></li>
+                            <li class="flex items-center text-gray-500"><b class="mr-2">×</b><span>Herramientas Premium ICONO</span></li>
+                        </ul>
+                        <a href="https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b07823530189" target="_blank" class="block w-full text-center font-bold py-3 rounded-lg transition duration-300 mt-auto border-2 border-pink-500 text-pink-500 hover:bg-pink-500 hover:text-white">Suscribirme</a>
+                        <div id="qr-pro-mensual" class="bg-white p-2 rounded-lg mt-4 mx-auto w-40 h-40"></div>
+                    </div>
+                    <!-- Plan ICONO Mensual -->
+                    <div class="card-bg p-6 rounded-xl flex flex-col h-full">
+                        <h3 class="text-2xl font-bold text-white">Plan ICONO</h3>
+                        <p class="text-gray-400 mb-4">Mensual</p>
+                        <p class="text-4xl font-extrabold text-white mb-4">$9.990<span class="text-lg font-medium text-gray-400">/mes</span></p>
+                        <ul class="space-y-3 text-gray-300 mb-6 flex-grow">
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span><b>Créditos Ilimitados</b></span></li>
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span>Acceso a <b>Todas</b> las Herramientas</span></li>
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span>Synth Preset & Marketing</span></li>
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span>Soporte Prioritario 24/7</span></li>
+                        </ul>
+                        <a href="https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b07908f0018a" target="_blank" class="block w-full text-center font-bold py-3 rounded-lg transition duration-300 mt-auto border-2 border-pink-500 text-pink-500 hover:bg-pink-500 hover:text-white">Suscribirme</a>
+                        <div id="qr-diamante-mensual" class="bg-white p-2 rounded-lg mt-4 mx-auto w-40 h-40"></div>
+                    </div>
+                    <!-- Plan PRO Anual -->
+                    <div class="card-bg p-6 rounded-xl flex flex-col h-full">
+                        <h3 class="text-2xl font-bold text-white">Plan PRODUCER</h3>
+                        <p class="text-gray-400 mb-4">Anual <span class="text-green-400 font-bold">(Ahorra 20%)</span></p>
+                        <p class="text-4xl font-extrabold text-white mb-4">$49.990<span class="text-lg font-medium text-gray-400">/año</span></p>
+                        <ul class="space-y-3 text-gray-300 mb-6 flex-grow">
+                             <li class="flex items-center"><b class="text-pink-500 mr-2">✓</b><span><b>50 Créditos</b> Mensuales</span></li>
+                            <li class="flex items-center"><b class="text-pink-500 mr-2">✓</b><span>Acceso a Herramientas PRO</span></li>
+                            <li class="flex items-center"><b class="text-pink-500 mr-2">✓</b><span>Acordes & Email Pitch</span></li>
+                            <li class="flex items-center text-gray-500"><b class="mr-2">×</b><span>Herramientas Premium ICONO</span></li>
+                        </ul>
+                        <a href="https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b0796b42018b" target="_blank" class="block w-full text-center font-bold py-3 rounded-lg transition duration-300 mt-auto border-2 border-pink-500 text-pink-500 hover:bg-pink-500 hover:text-white">Asegurar Ahorro</a>
+                        <div id="qr-pro-anual" class="bg-white p-2 rounded-lg mt-4 mx-auto w-40 h-40"></div>
+                    </div>
+                    <!-- Plan ICONO Anual (Recomendado) -->
+                    <div class="card-bg p-6 rounded-xl flex flex-col relative featured-plan h-full">
+                        <div class="absolute top-0 -translate-y-1/2 w-full flex justify-center"><span class="bg-yellow-500 text-black text-sm font-bold px-4 py-1 rounded-full uppercase tracking-wider">El Más Buscado</span></div>
+                        <h3 class="text-2xl font-bold text-white mt-4">Plan ICONO</h3>
+                        <p class="text-gray-400 mb-4">Anual <span class="text-green-400 font-bold">(Ahorra 20%)</span></p>
+                        <p class="text-4xl font-extrabold text-white mb-4">$99.990<span class="text-lg font-medium text-gray-400">/año</span></p>
+                        <ul class="space-y-3 text-gray-300 mb-6 flex-grow">
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span><b>Créditos Ilimitados</b></span></li>
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span>Acceso a <b>Todas</b> las Herramientas</span></li>
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span>Synth Preset & Marketing</span></li>
+                            <li class="flex items-center"><b class="text-yellow-400 mr-2">★</b><span>Soporte Prioritario 24/7</span></li>
+                        </ul>
+                        <a href="https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b079c656018c" target="_blank" class="block w-full text-center font-bold py-3 rounded-lg transition duration-300 mt-auto bg-yellow-500 text-black hover:bg-yellow-400">Obtener Acceso Total</a>
+                        <div id="qr-diamante-anual" class="bg-white p-2 rounded-lg mt-4 mx-auto w-40 h-40"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-black border-t border-gray-800 mt-24">
+        <div class="container mx-auto px-6 py-8 text-center text-gray-400">
+            <p>&copy; 2025 SonicLab. El Sonido del Futuro.</p>
+        </div>
+    </footer>
+
+    <div id="tool-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="tool-modal-title" class="text-2xl font-bold text-white flex items-center gap-3"></h2>
+                <button id="close-tool-modal-button" class="close-button">&times;</button>
+            </div>
+            <p id="tool-modal-description" class="text-gray-400 mb-6"></p>
+            <div id="tool-fields-container" class="space-y-4"></div>
+            <div id="tool-modal-output" class="mt-4 text-left bg-black p-4 rounded-lg border border-gray-700 min-h-[150px] max-h-60 overflow-y-auto"></div>
+            <div class="flex justify-between items-center mt-6">
+                <button id="tool-modal-submit" class="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-6 rounded-lg flex items-center">
+                    <span id="tool-modal-submit-text">Generar</span>
+                    <div id="tool-modal-loader" class="loader hidden ml-2 !w-5 !h-5 !border-2"></div>
+                </button>
+                <p id="tool-modal-cost" class="text-sm text-yellow-400 font-semibold"></p>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const { jsPDF } = window.jspdf;
+    const MidiWriter = window.MidiWriter;
+
+    // NOTE: This object defines the plans and their properties.
+    const planDetails = {
+        'GUEST': { name: 'Novato', credits: 3 },
+        'PRO': { name: 'Producer', credits: 50 },
+        'DIAMANTE': { name: 'Icono', credits: Infinity },
+        'CREATOR': { name: 'El Arquitecto', credits: Infinity }
+    };
+
+    // NOTE: This array contains all the tool definitions for the application.
+    const allTools = [
+        // --- CATEGORÍA: PRODUCCIÓN Y SONIDO ---
+        { id: 'mastering-de-elite-ia', name: 'Mastering de Élite IA', description: 'Sube tu canción y una referencia opcional para obtener un master de nivel mundial.', icon: '🎚️', requiredPlan: 'DIAMANTE', cost: 15, type: 'hybrid-mastering', tier: 'elite' },
+        { id: 'ingeniero-de-mezcla-ia', name: 'Ingeniero de Mezcla IA', description: 'Describe tus pistas (stems) y la IA identificará conflictos de frecuencia.', icon: '👨‍🔬', requiredPlan: 'DIAMANTE', cost: 10, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como un ingeniero de mezcla de élite como Serban Ghenea. Un artista te ha entregado los stems de su canción y describe los problemas así: "${p.descripcion}". Los stems son: ${p.stems}. Tu misión es identificar los 3 conflictos de frecuencia más probables entre estos elementos y entregar un plan de acción con seteos de EQ específicos (frecuencia, Q, ganancia) para cada uno. Finaliza con un **Tip de Oro** sobre el uso de compresión de bus para darle "pegamento" a la mezcla final.` },
+        { id: 'stem-splitter', name: 'Separador de Stems IA', description: 'Sube una canción completa y la IA la separará en vocales, bajo, batería y otros.', icon: '✂️', requiredPlan: 'DIAMANTE', cost: 20, type: 'replicate-audio-upload', tier: 'elite', model: 'cjwbw/demucs:25a173108cff36ef9f8043644d81df27ca350000dc30799639a0b16c1753ce03', input: (p) => ({ audio: p.audio_file }) },
+        { id: 'noise-reducer', name: 'Reductor de Ruido IA', description: 'Limpia tus grabaciones eliminando el ruido de fondo no deseado.', icon: '🤫', requiredPlan: 'PRO', cost: 5, type: 'replicate-audio-upload', model: 'b673833a09c638178d951564734411f3575f0483a2b1ef47b1b9a477fd25a3b3', input: (p) => ({ audio: p.audio_file }) },
+        { id: 'vocal-preset-ia', name: 'Vocal Preset IA 2.0', description: 'Obtén la cadena de efectos y seteos exactos para sonar como tus ídolos.', icon: '🎛️', requiredPlan: 'DIAMANTE', cost: 4, type: 'gemini-text', prompt: (p) => `Actúa como un ingeniero de mezcla de élite como Jaycen Joshua. Crea una cadena de mezcla vocal para sonar como ${p.artista} usando exclusivamente plugins de ${p.plugins}. La respuesta DEBE ser una guía profesional y detallada estructurada en: 1. "Filosofía del Sonido": Explica el carácter vocal del artista. 2. "Cadena de Plugins (En Orden)": Una lista numerada de los plugins. 3. "Seteos Detallados": Para CADA plugin, detalla los parámetros exactos (frecuencias de EQ, ratio de compresión, etc.). 4. "El Secreto del Ingeniero": Un truco final no convencional que defina el sonido.` },
+        { id: 'afinador-vocal-ia', name: 'Analizador de Afinación IA', description: 'Sube una pista vocal y la IA analizará la afinación, destacando las notas que necesitan corrección.', icon: '🎯', requiredPlan: 'PRO', cost: 5, type: 'gemini-text', prompt: (p) => `Actúa como un ingeniero de sonido experto en afinación vocal como 'Antares Auto-Tune'. He recibido una descripción de una pista vocal: "${p.descripcion}". Aunque no puedes escucharla, simula un análisis profesional. Identifica 3 áreas comunes donde los vocalistas suelen tener problemas de afinación (ej: vibratos, finales de frase, saltos de octava) y ofrece consejos técnicos sobre cómo corregirlos usando un software de afinación estándar. Finaliza con un **Tip de Oro** sobre el uso ético de la afinación para mantener la naturalidad.`},
+        { id: 'sonic-textures-ia', name: 'Generador de Texturas Sónicas IA', description: 'Crea paisajes sonoros y texturas atmosféricas únicas para dar profundidad a tus producciones.', icon: '🌌', requiredPlan: 'DIAMANTE', cost: 10, type: 'replicate-audio', tier: 'elite', model: 'meta/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906', input: (p) => ({ prompt: p.prompt, duration: 15 }) },
+        { id: 'sonic-emotion-analyzer-ia', name: 'Analizador de Emoción Sónica IA', description: 'Sube tu canción y la IA predice el impacto emocional, dándote un "mapa de sentimientos" de tu track.', icon: '🧬', requiredPlan: 'DIAMANTE', cost: 12, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como un musicólogo y analista de datos de 'The Echo Nest' (Spotify). Un artista ha subido una canción y la describe así: Tonalidad: "${p.tonalidad}", BPM: "${p.bpm}", Instrumentación: "${p.instrumentacion}", Estructura: "${p.estructura}". Basado en estos datos sónicos, genera un **Mapa de Emoción Sónica**. El análisis debe ser una línea de tiempo (Intro, Verso 1, Coro 1, etc.) y para cada sección, asigna una emoción primaria (ej: Tensión, Euforia, Nostalgia, Calma) y una secundaria. Justifica tu elección basándote en la teoría musical (ej: "La tonalidad menor y el tempo lento en el verso sugieren nostalgia, mientras que la entrada de la batería en el coro eleva la energía a euforia"). Finaliza con un **Tip de Oro** sobre cómo usar la 'disonancia' en el puente para maximizar el impacto emocional del último coro.`},
+
+        // --- CATEGORÍA: COMPOSICIÓN Y CREATIVIDAD ---
+        { id: 'sample-genesis-ia', name: 'Sample Genesis IA', description: 'Crea samples 100% originales y libres de regalías. Describe el loop que necesitas.', icon: '💎', requiredPlan: 'DIAMANTE', cost: 10, type: 'replicate-audio', tier: 'elite', model: 'meta/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906', input: (p) => ({ prompt: p.prompt, duration: 8 }) },
+        { id: 'co-productor-ia', name: 'Co-Productor IA', description: 'Recibe una melodía vocal original ("topline") y armonías en MIDI para tu beat.', icon: '🧑‍🎤', requiredPlan: 'DIAMANTE', cost: 12, type: 'gemini-midi', tier: 'elite', prompt: (p) => `Actúa como un "topliner" y compositor de élite. Has recibido un beat en la tonalidad de ${p.key} a ${p.bpm} BPM. Tu tarea es componer una melodía vocal principal y una armonía para un estribillo de 4 compases (64 semicorcheas). El estilo debe ser "${p.style}". La respuesta DEBE ser un objeto JSON con una clave "pattern". El valor debe ser un array de objetos, donde cada objeto representa una nota y tiene las claves "note" (ej: 'C#4'), "tick" (posición de 0 a 6144), "duration" (en ticks, ej: 192 para una corchea), y "velocity" (de 0 a 1). Asegúrate de que las notas estén dentro de la tonalidad de ${p.key}.` },
+        { id: 'ai-music-generator', name: 'Generador de Música IA', description: 'Describe una escena o un sentimiento y la IA compondrá una pieza musical.', icon: '🎵', requiredPlan: 'DIAMANTE', cost: 15, type: 'replicate-audio', model: 'meta/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906', input: (p) => ({ prompt: p.prompt, duration: 10 }) },
+        { id: 'flow-generator', name: 'Flow Generator 2.0', description: 'Genera chanteos, métricas y cadenas de rimas para romper el beat.', icon: '🎤', requiredPlan: 'PRO', cost: 1, type: 'gemini-text', prompt: (p) => `Actúa como un ghostwriter de élite que ha trabajado con Drake y Kendrick Lamar. Sobre el tema "${p.tema}", genera 8 barras de letra. El flow debe ser de ${p.flow}. La letra debe incluir punchlines complejos y una cadena de rimas multisilábicas al estilo de ${p.artista}. La respuesta DEBE incluir: 1. **Letra:** La letra, limpia y profesional. 2. **Análisis Estratégico:** Por qué esta letra es superior. 3. **Coaching Vocal (Tip de Oro):** Un consejo específico sobre la entrega, cadencia o acentuación de una línea clave para maximizar su impacto emocional. 4. **Mapa de Cadencia Visual (Texto):** Una representación simple de la cadencia de las primeras 2 barras (ej: | ta ta TA ta | ta ta TA - |).` },
+        { id: 'drum-pattern', name: 'Drum Pattern IA', description: 'Genera patrones de batería potentes y descárgalos en formato MIDI.', icon: '🥁', requiredPlan: 'PRO', cost: 2, type: 'gemini-midi', prompt: (p) => `Actúa como un productor de beats de nivel Grammy experto en ${p.genero}. Genera un patrón de batería de 2 compases (32 pasos). La respuesta DEBE ser un objeto JSON con una clave "pattern". El valor debe ser un array de objetos, donde cada objeto representa una nota y tiene las claves "note" (número MIDI: 36 para Kick, 38 para Snare, 42 para Hi-Hat), "tick" (posición de 0 a 3072, donde 96 ticks = 1 semicorchea), "duration" (en ticks, ej: 96), y "velocity" (de 0 a 1, ej: 0.9). Incluye variaciones de velocity para un groove humano.` },
+        { id: 'acordes-para-sample', name: 'Acordes para Sample', description: '¿Tienes un sample a capella? La IA te da progresiones de acordes y bajo.', icon: '🎼', requiredPlan: 'PRO', cost: 2, type: 'gemini-text', prompt: (p) => `Actúa como un productor y teórico musical de élite. Un artista tiene un sample a capella descrito como: "${p.descripcion}". Genera 2 progresiones de acordes. Para cada una, explica por qué funciona. Finaliza con: 1. **Línea de Bajo Sugerida:** Una línea de bajo simple en notación de notas (ej: C2 - G1 - A1 - F1) para la primera progresión. 2. **Acorde de Color (Tip de Oro):** Una sugerencia de un acorde de séptima o novena para añadir sofisticación.` },
+        { id: 'sonido-unico-ia', name: 'Sonido Único IA', description: 'Fusiona los estilos de tus ídolos para crear tu propio sonido.', icon: '🧬', requiredPlan: 'DIAMANTE', cost: 5, type: 'gemini-text', prompt: (p) => `Actúa como un productor ejecutivo visionario. Un artista quiere crear un sonido que fusione el estilo de "${p.artista1}" con "${p.artista2}". Genera un informe detallado sobre cómo lograr esta fusión. La respuesta debe incluir: 1. "Concepto Sónico": Cómo unir los dos mundos. 2. "Paleta Sónica Detallada": Qué tipo de 808, snare, y textura principal usar. 3. "El Secreto de la Fusión": Un truco de producción específico para que la mezcla de estilos funcione y suene original.` },
+        { id: 'synth-preset-ia', name: 'Synth Preset IA', description: 'Crea presets únicos para tus sintetizadores.', icon: '🎹', requiredPlan: 'DIAMANTE', cost: 3, type: 'gemini-text', prompt: (p) => `Actúa como un diseñador de sonido experto. Genera los parámetros para un preset de sintetizador basado en la siguiente descripción: "${p.descripcion}". La respuesta debe incluir: Tipo de Oscilador (Onda), Set de Envolvente (ADSR), Posición del Filtro (Cutoff) y una sugerencia de efecto (FX) para lograr ese sonido.` },
+        { id: 'remix-concept', name: 'Remix Concept IA', description: 'La IA diseña 3 conceptos de remix para tu tema en diferentes géneros.', icon: '🔀', requiredPlan: 'DIAMANTE', cost: 4, type: 'gemini-text', prompt: (p) => `Actúa como un productor y DJ de fama mundial. Tienes que remezclar la canción "${p.titulo}", que es un ${p.generoOriginal}. Genera 3 conceptos de remix en géneros diferentes y populares. Para cada concepto, describe: 1. El Nuevo Género. 2. El Nuevo BPM. 3. Los Elementos Clave a mantener de la original. 4. Los Nuevos Instrumentos a añadir.` },
+        { id: 'pulidor-de-letras-ia', name: 'Pulidor de Letras IA', description: 'Pega tu letra y la IA te sugerirá sinónimos, metáforas y formas de potenciar su impacto emocional.', icon: '✍️', requiredPlan: 'PRO', cost: 2, type: 'gemini-text', prompt: (p) => `Actúa como un letrista y poeta galardonado. Has recibido la siguiente letra: "${p.letra}". Tu tarea es analizarla y ofrecer mejoras concretas. La respuesta debe incluir: 1. **Reescritura Sugerida:** Una versión alternativa de una estrofa clave, con un lenguaje más evocador. 2. **Banco de Rimas y Sinónimos:** Para 3 palabras clave de la letra, ofrece 3 alternativas más potentes. 3. **Metáfora de Impacto (Tip de Oro):** Sugiere una metáfora o símil original que podría elevar el concepto central de la canción.`},
+
+        // --- CATEGORÍA: ESTRATEGIA Y NEGOCIO ---
+        { id: 'sello-discografico-ia', name: 'El Sello Discográfico IA', description: 'Recibe un plan de negocios y marketing completo para tu lanzamiento.', icon: '🏢', requiredPlan: 'DIAMANTE', cost: 25, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como el CEO de un sello discográfico de vanguardia como Interscope Records. Has recibido una nueva canción de un artista emergente. Título: "${p.titulo}", Género: "${p.genero}", Artistas Similares: "${p.similares}". Tu tarea es crear un **Plan de Lanzamiento de 8 Semanas** completo. El plan debe incluir: 1. **Presupuesto Sugerido** (desglosado en marketing digital, video, etc.). 2. **Estrategia de Contenido Semanal** para redes sociales. 3. **Pitch para Playlists Clave** (3 pitches para playlists reales de Spotify). 4. **Borrador de Comunicado de Prensa**. 5. **El Factor X (Tip de Oro):** Una idea de marketing no convencional que podría hacer que este lanzamiento se vuelva viral.` },
+        { id: 'analizador-de-viralidad-ia', name: 'Analizador de Viralidad IA', description: 'Sube un gancho de 15s. La IA le da un puntaje de viralidad y 3 consejos.', icon: '🚀', requiredPlan: 'DIAMANTE', cost: 8, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como un analista de tendencias virales de TikTok. Has recibido un clip de audio de 15 segundos. Basado en las características sónicas (BPM, pegada del beat, claridad de la melodía, tipo de sonido), evalúa su potencial de viralidad. La respuesta DEBE incluir: 1. **Puntuación de Viralidad (X/10):** Tu evaluación honesta. 2. **Diagnóstico Rápido:** Por qué le diste esa puntuación. 3. **Plan de Optimización (3 Pasos):** Tres consejos específicos y accionables (ej: "Añade un bajo 808 más saturado en el primer beat", "Haz la melodía vocal más simple y repetitiva", "Añade un efecto de sonido memorable como un 'riser' antes del drop") para aumentar drásticamente su potencial viral.` },
+        { id: 'director-de-videos-ia', name: 'Director de Videos IA', description: 'Recibe un concepto, storyboard y un keyframe visual generado por IA.', icon: '🎬', requiredPlan: 'DIAMANTE', cost: 12, type: 'gemini-image', tier: 'elite', prompt: (p) => `Actúa como un director de videos musicales de élite como Hype Williams. Para una canción titulada "${p.titulo}" con un mood "${p.mood}", tu tarea es generar un concepto de video completo. La respuesta debe ser un prompt de imagen para un generador de IA que capture la escena más icónica del video. Este prompt debe ser extremadamente detallado, describiendo la iluminación, el ángulo de cámara, el vestuario y la acción. Antes del prompt, incluye un **Concepto Creativo** y un **Storyboard de 3 Escenas Clave** que lleven a ese momento cumbre.` },
+        { id: 'visualizer-ia', name: 'Visualizador de Audio IA', description: 'Sube tu canción y la IA generará un video visualizador hipnótico para tus redes sociales.', icon: '🎆', requiredPlan: 'DIAMANTE', cost: 15, type: 'replicate-video', tier: 'elite', model: 'anotherjesse/zeroscope-v2-xl:9f747673744c618e444e734c04b547841f254d70253f59d896c3ba65c557248b', input: (p) => ({ prompt: p.prompt, audio: p.audio_file, num_frames: 200 }) },
+        { id: 'modo-genio', name: 'Modo Genio Élite', description: 'Recibe un plan creativo completo y dialoga con un mentor de élite para tu hit.', icon: '🧠', requiredPlan: 'DIAMANTE', cost: 5, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como ${p.mentor}, un visionario que entiende que la superioridad no está solo en la técnica, sino en la estrategia. Un artista te presenta una idea sobre "${p.tema}". Tu misión es crear un "Creative Brief" que sea una estrategia para crear un hit que genere lealtad. El brief DEBE incluir: 1. **Concepto Central y Ángulo Emocional:** Tu visión refinada de la idea. 2. **Estructura y 'Flow' Predictivo:** Cómo estructurarías la canción para máximo impacto. 3. **Sonido y Producción (La Ventaja Injusta):** Los 3 sonidos clave que le darían una ventaja sónica. 4. **El Secreto del Genio:** Un truco no convencional que haría la canción inolvidable.` },
+        { id: 'cover-art-director', name: 'Director de Arte IA', description: 'Genera una portada única y un kit visual completo para redes sociales.', icon: '🎨', requiredPlan: 'DIAMANTE', cost: 8, type: 'gemini-image', prompt: (p) => `Actúa como un director de arte de élite. Para una canción titulada "${p.titulo}" del artista "${p.artista}", con un mood "${p.mood}", crea un prompt de imagen extremadamente detallado para un generador de IA como Imagen 3. La respuesta debe ser únicamente el prompt. Al final, añade una sección **Kit Visual Completo (Tip de Oro):** con una paleta de 5 colores HEX extraídos de la idea, y 2 prompts adicionales, uno optimizado para un Spotify Canvas vertical (9:16) y otro para un banner de YouTube (16:9), manteniendo la coherencia visual.` },
+        { id: 'marketing-rollout-ia', name: 'Marketing Rollout IA', description: 'Diseña un plan de lanzamiento de 7 días para tu próximo hit.', icon: '📈', requiredPlan: 'DIAMANTE', cost: 4, type: 'gemini-text', prompt: (p) => `Actúa como un jefe de marketing de una discográfica. Crea un plan de lanzamiento de 7 días para redes sociales (Instagram/TikTok) para la canción "${p.cancion}". Detalla una idea de contenido para cada día, desde 5 días antes del lanzamiento hasta 1 día después, para generar el máximo hype. Para el día del lanzamiento, escribe el copy exacto de la publicación.` },
+        { id: 'storyboard-ia', name: 'Storyboard IA', description: 'Crea un storyboard profesional con 6 escenas clave para tu videoclip.', icon: '🎥', requiredPlan: 'DIAMANTE', cost: 4, type: 'gemini-text', prompt: (p) => `Actúa como un director de videoclips. Basado en la siguiente letra, crea un storyboard de 6 escenas clave. Para cada escena, describe: 1. El Número de Escena. 2. El Tipo de Plano (ej: Plano General, Primer Plano). 3. La Acción que ocurre. Letra: "${p.letra}".` },
+        { id: 'media-training-ia', name: 'Entrenamiento de Medios IA', description: 'Prepárate para cualquier entrevista con respuestas potentes y profesionales.', icon: '🎙️', requiredPlan: 'DIAMANTE', cost: 3, type: 'gemini-text', prompt: (p) => `Actúa como un publicista y entrenador de medios para artistas de primer nivel. Un artista llamado ${p.artista} va a ser entrevistado sobre su nueva canción "${p.cancion}". El mensaje clave es "${p.mensaje}". Genera respuestas profesionales y memorables para estas 3 preguntas comunes: 1. ¿De qué trata tu nueva canción? 2. ¿Cuál fue tu inspiración? 3. ¿Qué es lo siguiente para ti?` },
+        { id: 'identidad-de-marca-ia', name: 'Identidad de Marca IA', description: 'Crea un "Brand Kit" completo para tu proyecto artístico.', icon: '💎', requiredPlan: 'DIAMANTE', cost: 5, type: 'gemini-text', prompt: (p) => `Actúa como un director de marca de una agencia de alto nivel. Crea un "Brand Kit" para un artista. Nombre: "${p.nombre}". Temas clave en su música: "${p.temas}". Color principal: "${p.color}". La respuesta debe incluir: 1. "Concepto de Logo". 2. "Paleta de Colores" con 3 códigos HEX. 3. "Tipografía" (fuente para títulos y para texto). 4. "Voz de Marca" (3 palabras clave). 5. "Idea de Merchandising" creativa.` },
+        { id: 'global-release-planner', name: 'Global Release Planner', description: 'Crea una hoja de ruta para lanzar tu música en múltiples países.', icon: '🌎', requiredPlan: 'DIAMANTE', cost: 6, type: 'gemini-text', prompt: (p) => `Actúa como un jefe de marketing internacional de Sony Music. Para un lanzamiento de ${p.genero}, crea una estrategia de lanzamiento simultáneo para ${p.paises}. Para cada país, detalla: 1. **Día y Hora Óptima de Lanzamiento (hora local).** 2. **3 Playlists Editoriales Clave a las que apuntar.** 3. **2 Influencers o Medios de Comunicación locales relevantes para contactar.** 4. **Un Ángulo Cultural:** ¿Cómo se puede adaptar el mensaje de marketing para que resuene con la audiencia local?` },
+        { id: 'cultural-translator', name: 'Traductor Cultural', description: 'Adapta tus letras para que conecten culturalmente en otros países.', icon: '🌐', requiredPlan: 'DIAMANTE', cost: 4, type: 'gemini-text', prompt: (p) => `Actúa como un letrista y experto en localización cultural. Toma la siguiente letra de ${p.origen} y adáptala para el mercado de ${p.objetivo}. No traduzcas literalmente. Reemplaza modismos locales por equivalentes que resuenen en el mercado objetivo. Presenta el resultado en una tabla "Original vs. Adaptación" y añade una **Nota de Impacto Cultural (Tip de Oro):** explicando por qué un cambio específico es crucial para la conexión emocional con la nueva audiencia. Letra: "${p.letra}"` },
+        { id: 'royalty-split-simulator', name: 'Simulador de Regalías', description: 'Simula el reparto de regalías de tus canciones antes de colaborar.', icon: '💰', requiredPlan: 'DIAMANTE', cost: 4, type: 'gemini-text', prompt: (p) => `Actúa como un business manager de la industria musical. Basado en los siguientes colaboradores y porcentajes: "${p.colaboradores}", calcula las ganancias estimadas para cada parte de un total de ${p.streams} streams en Spotify (usando una tasa promedio de $0.003 USD por stream). Presenta los resultados en una tabla clara que muestre el porcentaje y el monto en dólares para cada colaborador. Añade una "Nota del Manager" con un consejo sobre si el reparto es justo y estándar para la industria.` },
+        { id: 'contract-analyzer', name: 'Analizador de Contratos', description: 'Analiza contratos, identifica "banderas rojas" y obtén palancas para negociar.', icon: '⚖️', requiredPlan: 'DIAMANTE', cost: 10, type: 'gemini-text', prompt: (p) => `Actúa como un abogado experto en la industria musical. Has recibido el siguiente texto de un contrato: "${p.texto}". Tu misión NO es dar consejo legal, sino educar al artista. Analiza el texto y genera un informe que incluya: 1. **Resumen Ejecutivo Simple.** 2. **Cláusulas Clave Explicadas.** 3. **Puntos de Palanca para Negociar (Tip de Oro):** Identifica 2-3 cláusulas donde un artista independiente tiene más poder para pedir mejores condiciones. 4. **Preguntas Inteligentes para tu Abogado.** 5. **Disclaimer Obligatorio:** Finaliza SIEMPRE con: '**Este análisis es una herramienta educativa y NO constituye asesoramiento legal. Es indispensable que consultes con un abogado cualificado antes de firmar cualquier documento legal.**'` },
+        { id: 'email-pitch', name: 'Email Pitch', description: 'Escribe emails profesionales para contactar a curadores, blogs o sellos.', icon: '📧', requiredPlan: 'PRO', cost: 1, type: 'gemini-text', prompt: (p) => `Actúa como un A&R y manager de artistas que entiende la psicología de la comunicación. Tu tarea es redactar un email para un ${p.destinatario} para presentar la canción "${p.cancion}" del artista ${p.artista}. El email debe ser corto, directo y contrarrestar el "déficit de confianza" del mercado. Debe ser hiper-personalizado, no un template. Incluye un llamado a la acción claro y el link: ${p.link}. La respuesta debe ser únicamente el texto del email, listo para copiar y pegar.` },
+        { id: 'hook-optimizer', name: 'Hook Optimizer', description: 'Crea títulos y ganchos virales para tus canciones y redes sociales.', icon: '🎣', requiredPlan: 'PRO', cost: 2, type: 'gemini-text', prompt: (p) => `Actúa como un director creativo y estratega de contenido viral. Basado en la letra y el tema "${p.tema}", genera: 1. **3 Títulos Optimizados.** 2. **3 Hooks Virales para TikTok/Reels.** 3. **Audio Viral Potencial (Tip de Oro):** Identifica el fragmento de 5-15 segundos de la letra con el mayor potencial para convertirse en un 'audio' popular en TikTok, explicando por qué (memorable, relatable, etc.).` },
+        { id: 'tech-rider-builder', name: 'Tech Rider Builder', description: 'Crea un Rider Técnico profesional para tus shows en vivo en segundos.', icon: '⚙️', requiredPlan: 'PRO', cost: 3, type: 'gemini-text', prompt: (p) => `Actúa como un tour manager y técnico de sonido experimentado. Un artista llamado "${p.nombre}" (contacto: ${p.contacto}) necesita un Rider Técnico profesional para su configuración de "${p.configuracion}" en un recinto "${p.recinto}". Genera un Rider Técnico completo. Al final, añade una sección **Notas del Tour Manager (Tip de Oro):** con un consejo práctico de adaptación basado en el tamaño del recinto seleccionado.` },
+        { id: 'metadata-generator', name: 'Generador de Metadatos', description: 'Genera todos los metadatos y textos para distribuir tu canción.', icon: '📝', requiredPlan: 'PRO', cost: 2, type: 'gemini-text', prompt: (p) => `Actúa como un especialista en distribución digital. Para la canción "${p.titulo}" de ${p.artista} (${p.genero}, mood ${p.mood}), genera la información lista para una distribuidora. Al final, añade una sección **Pitch para Playlists Específicas (Tip de Oro):** con un pitch corto y adaptado para las 2 playlists más importantes del género, explicando por qué encaja.` },
+        { id: 'trend-forecaster', name: 'Trend Forecaster Élite', description: 'Anticípate a las tendencias y obtén un plan para capitalizarlas.', icon: '📈', requiredPlan: 'DIAMANTE', cost: 5, type: 'gemini-text', prompt: (p) => `Actúa como un analista de datos y 'coolhunter' para una discográfica de primer nivel. Tu misión es detectar micro-tendencias antes de que se vuelvan mainstream. Analiza datos emergentes de TikTok, Spotify, y foros de música para el mercado ${p.mercado} dentro del género ${p.genero}. Genera un informe de inteligencia predictiva que incluya: 1. **La Próxima Ola Sónica:** Describe el subgénero que está ganando tracción. 2. **El ADN del Sonido:** Detalla 3-4 elementos sónicos que lo definen. 3. **Plan de Ataque Rápido:** Un plan de 3 pasos (Contenido TikTok, Producción, Anuncio) para que un artista pueda capitalizar esta tendencia esta misma semana.` },
+        { id: 'collab-architect', name: 'Collab Architect Élite', description: 'Encuentra colaboradores reales y obtén una propuesta de negocio.', icon: '🤝', requiredPlan: 'DIAMANTE', cost: 5, type: 'gemini-text', prompt: (p) => `Actúa como un A&R y estratega musical de élite. Para un artista llamado ${p.nombre} con el sonido "${p.descripcion}" y el objetivo de "${p.objetivo}", encuentra 3 colaboradores REALES y ACCIONABLES. Para cada sugerencia, entrega un informe estratégico: 1. **Artista Sugerido y Sinergia:** Nombre del artista real y por qué su sonido, marca y fans son compatibles. 2. **Concepto Creativo Ganador:** Describe la canción que crearían juntos. 3. **Pitch de Colaboración:** Un borrador del primer mensaje para contactarlo, enfocado en el beneficio mutuo.` },
+        { id: 'audience-analyzer', name: 'Audience Analyzer Élite', description: 'Convierte tus datos de Spotify en una matriz de contenido estratégico.', icon: '🎯', requiredPlan: 'DIAMANTE', cost: 5, type: 'gemini-text', prompt: (p) => `Actúa como un estratega de marketing digital. Has recibido estos datos de Spotify for Artists: Ciudades: "${p.ciudades}". Demografía: "${p.demografia}". Fuentes: "${p.fuentes}". Playlists: "${p.playlists}". Tu tarea es generar: 1. **Perfil de tu Fan Ideal ("Fan Persona"):** Dale un nombre, edad y motivaciones. 2. **Matriz de Contenido Estratégico:** Una tabla con ideas de contenido para TikTok, Instagram y YouTube Shorts, diseñadas específicamente para conectar con esa "Fan Persona". 3. **Próximo Movimiento Estratégico:** Basado en toda la data, ¿cuál debería ser el siguiente paso del artista para crecer?` },
+        { id: 'show-runner-ia', name: 'Arquitecto de Shows en Vivo IA', description: 'Diseña la experiencia completa de tu show en vivo, desde transiciones hasta cues de luces.', icon: '🏟️', requiredPlan: 'DIAMANTE', cost: 12, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como un director de shows en vivo para giras mundiales. Has recibido un setlist: "${p.setlist}". El objetivo es crear un show inolvidable. Genera un "Show File" que incluya: 1. **Arco Energético:** Cómo fluye la energía del show. 2. **Transiciones Creativas:** Ideas para unir 2 canciones clave. 3. **Guion de Iluminación y Visuales:** Cues para el coro de la canción más importante. 4. **Momentos de Interacción con el Público:** 2 ideas para conectar con la audiencia. Finaliza con un **Tip de Oro** sobre cómo abrir el show para un impacto máximo.`},
+        { id: 'merch-studio-ia', name: 'Estudio de Merchandising IA', description: 'Genera diseños de merchandising, mockups realistas y textos para tu tienda online.', icon: '👕', requiredPlan: 'DIAMANTE', cost: 10, type: 'gemini-image', tier: 'elite', prompt: (p) => `Actúa como un director creativo para una marca de streetwear. Para un artista con el concepto "${p.concepto}", genera un prompt de imagen detallado para un diseño de polera (camiseta). El prompt debe describir el gráfico, la tipografía y el estilo. Antes del prompt, escribe una **Descripción del Producto** para una tienda online, y después, un **Tip de Oro** sobre cómo promocionar este item en Instagram.`},
+        { id: 'lyric-video-director-ia', name: 'Director de Lyric Videos IA', description: 'Obtén una dirección creativa completa para tu próximo lyric video, incluyendo un keyframe visual.', icon: '🎥', requiredPlan: 'DIAMANTE', cost: 12, type: 'gemini-image', tier: 'elite', prompt: (p) => `Actúa como un director creativo y motion designer. Para una canción con la letra "${p.letra}" y el mood "${p.mood}", genera un concepto visual completo para un lyric video. La respuesta debe incluir: 1. **Concepto General.** 2. **Guion Visual:** Describe cómo se verán el verso, el coro y el puente. 3. **Prompt de Imagen para Keyframe:** Un prompt detallado para generar la imagen más potente del video. Finaliza con un **Tip de Oro** sobre cómo hacer que el video sea más dinámico en YouTube Shorts.`},
+        { id: 'setlist-planner-ia', name: 'Planificador de Setlist IA', description: 'Introduce tus canciones y la duración del show para crear un setlist dinámico.', icon: '📋', requiredPlan: 'PRO', cost: 3, type: 'gemini-text', prompt: (p) => `Actúa como un director de shows en vivo. Un artista tiene que preparar un show de ${p.duracion} minutos. Sus canciones son: "${p.canciones}". El objetivo del show es "${p.objetivo}". Crea un setlist óptimo, ordenando las canciones para crear un arco energético (inicio potente, momento íntimo, final explosivo). Justifica brevemente la posición de 3 canciones clave. Añade un **Tip de Oro** sobre las transiciones entre canciones para que el show fluya sin interrupciones.`},
+        { id: 'press-kit-ia', name: 'Generador de Press Kit IA', description: 'Introduce tu información y la IA redactará una biografía profesional y un kit de prensa (EPK).', icon: '🗞️', requiredPlan: 'DIAMANTE', cost: 8, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como un publicista musical de alto nivel. Estás creando un Kit de Prensa Electrónico (EPK) para ${p.artista}. Su música es ${p.genero} y sus logros son "${p.logros}". Genera el contenido completo del EPK, que debe incluir: 1. **Biografía Oficial (Párrafo Corto y Largo).** 2. **Puntos Clave (Bullet points con logros).** 3. **Descripción de su Sonido.** 4. **Pitch de una línea para la prensa.** Finaliza con un **Tip de Oro** sobre la foto de prensa ideal que debería acompañar este EPK.`},
+        { id: 'publishing-navigator-ia', name: 'Navegador de Publishing IA', description: 'Entiende cómo registrar tus obras, qué son las PROs y cómo cobrar todas tus regalías.', icon: '🧭', requiredPlan: 'DIAMANTE', cost: 10, type: 'gemini-text', tier: 'elite', prompt: (p) => `Actúa como un experto en publishing musical y A&R de una editorial como Kobalt Music. Un artista de ${p.pais} quiere entender cómo funciona el publishing para su canción "${p.cancion}". Explica de forma clara y accionable: 1. **La Diferencia Clave:** ¿Qué es el publishing (obra) vs. el máster (grabación)? 2. **Registro de la Obra:** ¿Dónde y cómo debe registrar su canción en ${p.pais} para proteger sus derechos de autor? Menciona la entidad local específica. 3. **Las Sociedades de Gestión (PROs):** Explica qué son (ej: ASCAP, BMI, SESAC, y la equivalente en ${p.pais}) y por qué es crucial afiliarse a una. 4. **Flujo de Regalías:** Dibuja un mapa simple (usando texto) de cómo viaja el dinero desde una reproducción en Spotify hasta su bolsillo, mencionando las regalías mecánicas y de ejecución pública. Finaliza con un **Tip de Oro** sobre el 'split sheet' y por qué es el documento más importante para evitar problemas legales con colaboradores.`},
+    ];
+    
+    // NOTE: This object holds references to key DOM elements.
+    let userState = { plan: 'GUEST', credits: 3 };
+    const dom = {
+        userStatusContainer: document.getElementById('user-status-container'),
+        toolsGrid: document.getElementById('tools-grid'),
+        eliteToolsGrid: document.getElementById('elite-tools-grid'),
+        toolModal: document.getElementById('tool-modal'),
+        closeToolModalBtn: document.getElementById('close-tool-modal-button'),
+        toolModalTitle: document.getElementById('tool-modal-title'),
+        toolModalDescription: document.getElementById('tool-modal-description'),
+        toolModalCost: document.getElementById('tool-modal-cost'),
+        toolModalOutput: document.getElementById('tool-modal-output'),
+        toolModalSubmit: document.getElementById('tool-modal-submit'),
+        toolModalSubmitText: document.getElementById('tool-modal-submit-text'),
+        toolModalLoader: document.getElementById('tool-modal-loader'),
+        toolFieldsContainer: document.getElementById('tool-fields-container'),
+        adminPanel: document.getElementById('admin-panel'),
+        adminGenerateLinkBtn: document.getElementById('admin-generate-link'),
+    };
+
+    // NOTE: Main initialization function.
+    function init() {
+        loadUserState();
+        setupEventListeners();
+        setupQRCodes();
+        setupAnimatedBackground();
+        updateBranding();
+    }
+    
+    function updateBranding() {
+        document.title = 'SonicLab - Forja tus Hits';
+        document.querySelector('header .text-2xl').innerHTML = 'SONIC<span class="gradient-text">LAB</span>';
+    }
+
+    // NOTE: Loads user state from localStorage or URL hash.
+    function loadUserState() {
+        const urlHash = window.location.hash;
+        if (urlHash.startsWith('#grant-')) {
+            try {
+                const encodedData = urlHash.substring(7);
+                const decodedData = atob(encodedData);
+                const [email, plan, credits] = decodedData.split('|');
+                if (plan && plan !== 'NINGUNO') userState.plan = plan;
+                if (credits) userState.credits = (userState.credits === Infinity) ? Infinity : userState.credits + parseInt(credits, 10);
+                saveUserState();
+                alert(`¡Bienvenido, ${email}! Se han aplicado tus beneficios: Plan ${plan} y ${credits} créditos.`);
+            } catch (e) {
+                console.error("Error al decodificar el hash de concesión:", e);
+            }
+            window.location.hash = ''; // Clean the hash
+        } else if (urlHash === '#!creator-access-key-77-soniclab-2025') {
+            userState = { plan: 'CREATOR', credits: Infinity };
+            dom.adminPanel.classList.remove('hidden');
+            saveUserState(); 
+            window.location.hash = ''; 
+        } else {
+            const savedState = localStorage.getItem('sonicLabState');
+            if (savedState) {
+                userState = JSON.parse(savedState);
+            }
+        }
+        updateUI();
+    }
+    
+    function saveUserState() {
+        localStorage.setItem('sonicLabState', JSON.stringify(userState));
+    }
+
+    // NOTE: Updates the UI based on the current user state.
+    function updateUI() {
+        const planInfo = planDetails[userState.plan] || planDetails['GUEST'];
+        const creditsText = userState.credits === Infinity ? 'Ilimitados' : `${userState.credits} Créditos`;
+        let planColorClass = 'text-gray-400';
+        if (userState.plan === 'PRO') planColorClass = 'plan-producer';
+        if (userState.plan === 'DIAMANTE') planColorClass = 'plan-icono';
+        if (userState.plan === 'CREATOR') planColorClass = 'plan-creator';
+
+        dom.userStatusContainer.innerHTML = `<div><p class="font-bold text-white ${planColorClass}">${planInfo.name}</p><p class="text-sm text-gray-400">${creditsText}</p></div>`;
+        renderTools();
+    }
+
+    // NOTE: Renders all the tool cards in their respective grids.
+    function renderTools() {
+        dom.toolsGrid.innerHTML = '';
+        dom.eliteToolsGrid.innerHTML = '';
+
+        const standardTools = allTools.filter(tool => !tool.tier || tool.tier !== 'elite');
+        const eliteTools = allTools.filter(tool => tool.tier === 'elite');
+
+        const renderGrid = (tools, gridElement) => {
+            tools.forEach(tool => {
+                const isPremiumTool = tool.requiredPlan === 'DIAMANTE';
+                const canAfford = userState.credits === Infinity || userState.credits >= tool.cost;
+                
+                let hasPlanAccess = false;
+                if (userState.plan === 'CREATOR' || userState.plan === 'DIAMANTE') {
+                    hasPlanAccess = true;
+                } else if (userState.plan === 'PRO') {
+                    hasPlanAccess = !isPremiumTool;
+                }
+
+                const isEffectivelyDisabled = !canAfford || !hasPlanAccess;
+                
+                const toolCard = document.createElement('div');
+                let cardClasses = `card-bg p-6 rounded-2xl text-center transform hover:scale-105 transition-transform duration-300 flex flex-col relative`;
+                
+                if (isEffectivelyDisabled) {
+                    cardClasses += ' disabled-tool';
+                } else {
+                    cardClasses += ' cursor-pointer';
+                }
+                
+                if (tool.tier === 'elite') {
+                    cardClasses += ' premium-tool-glow';
+                }
+                toolCard.className = cardClasses;
+                
+                let overlay = '';
+                if (!hasPlanAccess) {
+                    overlay = `<div class="locked-overlay" onclick="event.stopPropagation(); document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' });"><span class="text-4xl" title="Requiere Plan ${tool.requiredPlan}">👑</span></div>`;
+                }
+
+                toolCard.innerHTML = `
+                    ${isPremiumTool ? '<div class="absolute top-4 right-4 text-yellow-400 text-2xl">👑</div>' : ''}
+                    <div class="text-5xl mb-4">${tool.icon}</div>
+                    <h3 class="text-xl font-bold mb-2 text-white">${tool.name}</h3>
+                    <p class="text-gray-400 flex-grow text-sm">${tool.description}</p>
+                    <p class="text-yellow-400 font-bold mt-4">Costo: ${tool.cost} Crédito(s)</p>
+                    ${overlay}
+                `;
+                
+                toolCard.addEventListener('click', () => {
+                    if (isEffectivelyDisabled) {
+                        alert(`No tienes acceso a esta herramienta. Requiere el plan ${tool.requiredPlan} o créditos suficientes.`);
+                        return;
+                    }
+                    openToolModal(tool);
+                });
+                
+                gridElement.appendChild(toolCard);
+            });
+        };
+
+        renderGrid(standardTools, dom.toolsGrid);
+        renderGrid(eliteTools, dom.eliteToolsGrid);
+    }
+
+    // NOTE: Opens and populates the tool modal.
+    function openToolModal(tool) {
+        dom.toolModalTitle.innerHTML = `<span class="text-4xl">${tool.icon}</span> ${tool.name}`;
+        dom.toolModalDescription.textContent = tool.description;
+        dom.toolModalCost.textContent = `Costo: ${tool.cost} créditos.`;
+        dom.toolModalOutput.innerHTML = '<p class="text-gray-500">El resultado aparecerá aquí...</p>';
+        renderToolInputs(tool);
+        dom.toolModalSubmit.onclick = () => handleToolExecution(tool);
+        dom.toolModal.classList.add('active');
+    }
+
+    function closeModal() {
+        dom.toolModal.classList.remove('active');
+    }
+
+    // NOTE: Renders the specific input fields for a given tool.
+    function renderToolInputs(tool) {
+        const container = dom.toolFieldsContainer;
+        container.innerHTML = ''; 
+        let fieldsHtml = '';
+
+        if (tool.type === 'replicate-audio-upload' || tool.id === 'analizador-de-viralidad-ia') {
+            fieldsHtml = `<input type="file" id="audio-file-input" accept="audio/*" class="file-input">`;
+        } else if (tool.type === 'hybrid-mastering') {
+            fieldsHtml = `
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1" for="user-track-input">1. Sube tu canción (WAV, MP3)</label>
+                    <input type="file" id="user-track-input" accept="audio/*" class="file-input">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1" for="reference-track-input">2. Sube una referencia (Opcional)</label>
+                    <input type="file" id="reference-track-input" accept="audio/*" class="file-input">
+                </div>
+            `;
+        } else if (tool.type === 'replicate-audio') {
+             fieldsHtml = `<textarea id="prompt-input" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2" rows="3" placeholder="Ej: un piano melancólico de R&B de los 90..."></textarea>`;
+        } else if (tool.type === 'replicate-video') {
+            fieldsHtml = `
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1" for="audio-file-input">1. Sube tu canción (MP3)</label>
+                    <input type="file" id="audio-file-input" accept="audio/mpeg" class="file-input mb-4">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1" for="prompt-input">2. Describe el visual que quieres</label>
+                    <textarea id="prompt-input" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2" rows="3" placeholder="Ej: galaxias explotando al ritmo del bajo..."></textarea>
+                </div>
+            `;
+        } else if (tool.type.startsWith('gemini')) {
+            const params = (tool.prompt.toString().match(/\$\{p\.(.*?)\}/g) || []).map(v => v.slice(4, -1));
+            params.forEach(param => {
+                const placeholder = param.charAt(0).toUpperCase() + param.slice(1).replace(/([A-Z])/g, ' $1');
+                if (param.toLowerCase().includes('letra') || param.toLowerCase().includes('descripcion') || param.toLowerCase().includes('texto') || param.toLowerCase().includes('logros') || param.toLowerCase().includes('canciones') || param.toLowerCase().includes('setlist') || param.toLowerCase().includes('instrumentacion') || param.toLowerCase().includes('estructura')) {
+                    fieldsHtml += `<textarea id="tool-input-${param}" class="w-full bg-gray-800 p-2 rounded mt-2 text-white border border-gray-700 focus:border-pink-500" rows="4" placeholder="${placeholder}..."></textarea>`;
+                } else {
+                    fieldsHtml += `<input type="text" id="tool-input-${param}" class="w-full bg-gray-800 p-2 rounded mt-2 text-white border border-gray-700 focus:border-pink-500" placeholder="${placeholder}">`;
+                }
+            });
+        }
+        container.innerHTML = fieldsHtml || `<p class="text-gray-500">No se requieren campos adicionales.</p>`;
+    }
+
+    // NOTE: Gathers all input values from the modal form.
+    function getToolInputs(tool) {
+        const inputs = {};
+        if (tool.type === 'replicate-audio-upload' || tool.id === 'analizador-de-viralidad-ia') {
+            const fileInput = document.getElementById('audio-file-input');
+            if (!fileInput || !fileInput.files[0]) { alert("Por favor, selecciona un archivo de audio."); return null; }
+            inputs.audio_file = fileInput.files[0];
+        } else if (tool.type === 'hybrid-mastering') {
+            const userTrackInput = document.getElementById('user-track-input');
+            const referenceTrackInput = document.getElementById('reference-track-input');
+            if (!userTrackInput || !userTrackInput.files[0]) { alert("Por favor, sube tu canción."); return null; }
+            inputs.userTrack = userTrackInput.files[0];
+            inputs.referenceTrack = referenceTrackInput.files[0] || null;
+        } else if (tool.type === 'replicate-audio') {
+            const promptInput = document.getElementById('prompt-input');
+            if (!promptInput.value.trim()) { alert("Por favor, describe el audio que quieres crear."); return null; }
+            inputs.prompt = promptInput.value;
+        } else if (tool.type === 'replicate-video') {
+            const fileInput = document.getElementById('audio-file-input');
+            const promptInput = document.getElementById('prompt-input');
+            if (!fileInput || !fileInput.files[0]) { alert("Por favor, selecciona un archivo de audio."); return null; }
+            if (!promptInput || !promptInput.value.trim()) { alert("Por favor, describe el visual."); return null; }
+            inputs.audio_file = fileInput.files[0];
+            inputs.prompt = promptInput.value.trim();
+        } else if (tool.type.startsWith('gemini')) {
+            const params = (tool.prompt.toString().match(/\$\{p\.(.*?)\}/g) || []).map(v => v.slice(4, -1));
+            for (const param of params) {
+                const inputEl = document.getElementById(`tool-input-${param}`);
+                if (!inputEl || !inputEl.value.trim()) {
+                    alert(`Por favor, completa el campo: ${param}`);
+                    return null;
+                }
+                inputs[param] = inputEl.value.trim();
+            }
+        }
+        return inputs;
+    }
+
+    // NOTE: Sets up global event listeners.
+    function setupEventListeners() {
+        dom.closeToolModalBtn.addEventListener('click', closeModal);
+        window.addEventListener('click', (e) => { if (e.target === dom.toolModal) closeModal(); });
+        dom.adminGenerateLinkBtn.addEventListener('click', () => {
+            const email = document.getElementById('admin-email').value;
+            const plan = document.getElementById('admin-plan').value;
+            const credits = document.getElementById('admin-credits').value || 0;
+            if (!email) { alert("Por favor, ingresa el email del usuario."); return; }
+            const dataToEncode = `${email}|${plan}|${credits}`;
+            const encodedData = btoa(dataToEncode);
+            const baseUrl = window.location.href.split('#')[0];
+            let grantUrl = `${baseUrl}#grant-${encodedData}`;
+            const mailtoLink = `mailto:${email}?subject=Tu Acceso Exclusivo a SonicLab&body=¡Hola!%0A%0AComo agradecimiento, hemos activado beneficios especiales para ti en SonicLab.%0A%0AHaz clic en este enlace mágico para reclamarlos (se aplicarán automáticamente al abrir la página):%0A%0A${encodeURIComponent(grantUrl)}%0A%0A¡Nos vemos en el laboratorio!%0A%0AEl equipo de SonicLab`;
+            window.location.href = mailtoLink;
+        });
+    }
+
+    // NOTE: Generates QR codes for payment links.
+    function setupQRCodes() {
+        const planLinks = {
+            'pro-mensual': 'https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b07823530189',
+            'diamante-mensual': 'https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b07908f0018a',
+            'pro-anual': 'https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b0796b42018b',
+            'diamante-anual': 'https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=2c93808490a7074e0190b079c656018c'
+        };
+        for (const [id, link] of Object.entries(planLinks)) {
+            const qrContainer = document.getElementById(`qr-${id}`);
+            if (qrContainer) {
+                const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}&bgcolor=ffffff&color=000000&margin=10`;
+                qrContainer.innerHTML = `<img src="${qrCodeUrl}" alt="Código QR para el plan ${id}" class="rounded-md w-full h-auto">`;
+            }
+        }
+    }
+
+    // NOTE: Converts a file object to a base64 data URL.
+    async function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
+    
+    // --- TOOL EXECUTION LOGIC ---
+    // NOTE: This is the core function that handles the API call to the Netlify function.
+    async function handleToolExecution(tool) {
+        const inputs = getToolInputs(tool);
+        if (!inputs) return;
+
+        dom.toolModalSubmitText.textContent = 'Creando...';
+        dom.toolModalLoader.classList.remove('hidden');
+        dom.toolModalSubmit.disabled = true;
+        dom.toolModalOutput.innerHTML = `<div class="flex justify-center items-center h-full"><div class="loader"></div></div>`;
+
+        try {
+            let body = { 
+                toolId: tool.id, 
+                toolType: tool.type,
+                inputs: {} 
+            };
+            
+            if (tool.type.startsWith('gemini')) {
+                body.inputs.prompt = tool.prompt(inputs);
+            } else if (tool.type.startsWith('replicate') || tool.type === 'hybrid-mastering') {
+                body.inputs.model = tool.model;
+                const finalInputs = { ...inputs };
+                if (finalInputs.audio_file) finalInputs.audio_file = await fileToBase64(finalInputs.audio_file);
+                if (finalInputs.userTrack) finalInputs.userTrack = await fileToBase64(finalInputs.userTrack);
+                if (finalInputs.referenceTrack) finalInputs.referenceTrack = await fileToBase64(finalInputs.referenceTrack);
+                body.inputs.replicate_payload = tool.input ? tool.input(finalInputs) : finalInputs;
+            }
+
+            // The fetch call points to the serverless function. This is correct.
+            // The problem was that the function itself was missing or misconfigured on Netlify's side.
+            const response = await fetch('/.netlify/functions/soniclab-api', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const errorResult = await response.json();
+                throw new Error(errorResult.error || 'Ocurrió un error en el servidor.');
+            }
+
+            const result = await response.json();
+            
+            // Display results based on their type
+            if (result.type === 'gemini-midi') displayGeminiResult(tool, result.data);
+            else if (result.type === 'gemini-image') displayImageResult(result.data);
+            else if (result.type.startsWith('replicate')) displayReplicateResult(tool, result.data);
+            else if (result.type === 'hybrid-mastering') dom.toolModalOutput.innerHTML = `<h3>Informe del Ingeniero IA:</h3><div class="text-sm mb-4">${result.brief.replace(/\n/g, '<br>')}</div><h3 class="mt-6">Resultado Final:</h3><audio controls class="w-full" src="${result.audioUrl}"></audio><a href="${result.audioUrl}" download="mastered_track.wav" class="mt-4 inline-block download-button font-bold py-2 px-4 rounded-lg">Descargar Master</a>`;
+            else displayGeminiResult(tool, result.data);
+
+
+            if (userState.credits !== Infinity) {
+                userState.credits -= tool.cost;
+                saveUserState();
+                updateUI();
+            }
+        } catch (error) {
+            console.error("Error en la ejecución:", error);
+            dom.toolModalOutput.innerHTML = `<p class="text-red-500 font-bold">Error: ${error.message}</p>`;
+        } finally {
+            dom.toolModalSubmitText.textContent = 'Generar';
+            dom.toolModalLoader.classList.add('hidden');
+            dom.toolModalSubmit.disabled = false;
+        }
+    }
+
+    // --- RESULT DISPLAY FUNCTIONS ---
+    function displayGeminiResult(tool, text) {
+        if (tool.type === 'gemini-midi') {
+            try {
+                const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+                const midiData = JSON.parse(jsonString);
+                const track = new MidiWriter.Track();
+                midiData.pattern.forEach(note => {
+                    track.addEvent(new MidiWriter.NoteEvent({
+                        pitch: [note.note],
+                        tick: note.tick,
+                        duration: `T${note.duration}`,
+                        velocity: Math.round(note.velocity * 100)
+                    }));
+                });
+                const writer = new MidiWriter.Writer([track]);
+                const midiDataUri = writer.dataUri();
+                dom.toolModalOutput.innerHTML = `<div class="text-center p-4"><p class="font-bold text-lg mb-4">¡Tu patrón MIDI está listo!</p><a href="${midiDataUri}" download="${tool.id}.mid" class="inline-block download-button font-bold py-2 px-6 rounded-lg">Descargar .MID</a></div>`;
+            } catch (e) {
+                console.error("Error al parsear MIDI JSON:", e);
+                dom.toolModalOutput.innerHTML = `<p class="text-red-500">Error al procesar MIDI.</p><div class="mt-2 text-xs bg-gray-900 p-2 rounded">${text}</div>`;
+            }
+        } else {
+            dom.toolModalOutput.innerHTML = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-pink-400">$1</strong>');
+        }
+    }
+
+    function displayImageResult(imageUrl) {
+        dom.toolModalOutput.innerHTML = `<img src="${imageUrl}" class="w-full h-auto rounded-lg" alt="Generado por IA"><a href="${imageUrl}" download="soniclab_art.png" class="mt-4 inline-block download-button font-bold py-2 px-4 rounded-lg">Descargar Imagen</a>`;
+    }
+
+    function displayReplicateResult(tool, output) {
+        if (tool.id === 'stem-splitter') {
+            let html = '<p class="font-bold text-lg mb-4">Stems Listos:</p>';
+            for (const [stemName, url] of Object.entries(output)) {
+                if(url) html += `<div class="flex items-center justify-between p-2 bg-gray-800 rounded mb-2"><span>${stemName.charAt(0).toUpperCase() + stemName.slice(1)}</span><a href="${url}" target="_blank" download class="px-3 py-1 text-sm rounded download-button">Descargar</a></div>`;
+            }
+            dom.toolModalOutput.innerHTML = html;
+        } else if (tool.type === 'replicate-video') {
+            dom.toolModalOutput.innerHTML = `<p class="font-bold text-lg mb-2">Visualizador Listo:</p><video controls class="w-full rounded-lg" src="${output}"></video><a href="${output}" download="soniclab_visualizer.mp4" class="mt-4 inline-block download-button font-bold py-2 px-4 rounded-lg">Descargar Video</a>`;
+        } else {
+            dom.toolModalOutput.innerHTML = `<p class="font-bold text-lg mb-2">Resultado:</p><audio controls class="w-full" src="${output}"></audio><a href="${output}" download="soniclab_audio.mp3" class="mt-4 inline-block download-button font-bold py-2 px-4 rounded-lg">Descargar Audio</a>`;
+        }
+    }
+    
+    // --- ANIMATED BACKGROUND LOGIC ---
+    function setupAnimatedBackground() {
+        const canvas = document.getElementById('animated-bg');
+        const ctx = canvas.getContext('2d');
+        let width, height, waves, time = 0;
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            waves = [
+                { color: 'rgba(255, 27, 107, 0.3)', amplitude: height / 4, frequency: 0.01, speed: 0.015, offset: 0 },
+                { color: 'rgba(245, 158, 11, 0.2)', amplitude: height / 5, frequency: 0.015, speed: 0.02, offset: 1 },
+                { color: 'rgba(192, 38, 211, 0.2)', amplitude: height / 6, frequency: 0.02, speed: 0.025, offset: 2 }
+            ];
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            time += 1;
+
+            waves.forEach(wave => {
+                ctx.beginPath();
+                ctx.strokeStyle = wave.color;
+                ctx.lineWidth = 2;
+                
+                for (let x = 0; x < width; x++) {
+                    const y = height / 2 + wave.amplitude * Math.sin(x * wave.frequency + time * wave.speed + wave.offset);
+                    if (x === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        window.addEventListener('resize', init);
+        init();
+        draw();
+    }
+
+    init();
+});
+</script>
+
+</body>
+</html>
